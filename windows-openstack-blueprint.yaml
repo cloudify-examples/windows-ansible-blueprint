@@ -1,0 +1,67 @@
+tosca_definitions_version: cloudify_dsl_1_2
+
+imports:
+  - http://www.getcloudify.org/spec/cloudify/3.3.1/types.yaml
+  - http://www.getcloudify.org/spec/openstack-plugin/1.3.1/plugin.yaml
+
+inputs:
+
+  image_id:
+    type: string
+
+  flavor_id:
+    type: string
+
+node_types:
+
+  cloudify.nodes.Manager.Ansible:
+    derived_from: cloudify.nodes.SoftwareComponent
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: script.script_runner.tasks.run
+          executor: central_deployment_agent
+          inputs:
+            script_path:
+              default: scripts/create.sh
+
+node_templates:
+
+  windows_host:
+    type: cloudify.openstack.nodes.WindowsServer
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        start:
+          max_retries: 50
+    properties:
+      image: { get_input: image_id }
+      flavor: { get_input: flavor_id }
+      cloudify_agent:
+        user: Admin
+        port: 5985
+      server:
+        userdata: |
+          #ps1_sysnative
+          winrm quickconfig -q
+          winrm set winrm/config              '@{MaxTimeoutms="1800000"}'
+          winrm set winrm/config/winrs        '@{MaxMemoryPerShellMB="300"}'
+          winrm set winrm/config/service      '@{AllowUnencrypted="true"}'
+          winrm set winrm/config/service/auth '@{Basic="true"}'
+          &netsh advfirewall firewall add rule name="WinRM 5985" protocol=TCP dir=in localport=5985 action=allow
+          &netsh advfirewall firewall add rule name="WinRM 5986" protocol=TCP dir=in localport=5986 action=allow
+
+  ansible_play:
+    type: cloudify.nodes.SoftwareComponent
+    interfaces:
+      cloudify.interfaces.lifecycle:
+        create:
+          implementation: script.script_runner.tasks.run
+          inputs:
+            script_path: scripts/ansible/windows_play.sh
+            process:
+              env:
+                WINDOWS_PASSWORD: { get_attribute: [ windows_host, password ] }
+          executor: central_deployment_agent
+    relationships:
+      - type: cloudify.relationships.contained_in
+        target: windows_host
