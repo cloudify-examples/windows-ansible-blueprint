@@ -1,3 +1,5 @@
+[![Build Status](https://circleci.com/gh/cloudify-examples/windows-ansible-blueprint.svg?style=shield&circle-token=:circle-token)](https://circleci.com/gh/cloudify-examples/windows-ansible-blueprint)
+
 # windows-ansible-blueprint
 
 Uses the Cloudify Script Plugin to execute the Ansible win_ping module against a single Windows host.
